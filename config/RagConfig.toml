@@ -15,7 +15,7 @@ ENDPOINT = "https://api.cerebras.ai/v1"
 # Sampling temperature for generation (lower = more deterministic, higher = more random)
 TEMPERATURE = 0.1
 # Maximum number of tokens to generate in a single response
-MAX_TOKENS = 4096
+MAX_TOKENS = 8192
 
 # Any OpenAI compatible model and platform can be added 
 #for ex:
