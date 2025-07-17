@@ -5,6 +5,8 @@ from typing import Optional
 import logging
 from pathlib import Path
 from dynaconf import Dynaconf
+from typing import List, Dict, Any, Optional
+import json
 
 from ratelimiter import RateLimiter
 from tokenlogger import SimpleTokenLogger
@@ -61,14 +63,22 @@ generator = OpenAIChatGenerator(
 
 app = FastAPI()
 
+class ChunkInfo(BaseModel):
+    chunk_id: str
+    summary: str
+    metadata: Dict[str, Any] = {}
+    score: Optional[float] = None
+
 class QueryRequest(BaseModel):
     question: str
     k_sent: Optional[int] = 20
     k_parent: Optional[int] = 10
-    max_return: Optional[int] = 3
+    max_return: Optional[int] = 10
 
 class QueryResponse(BaseModel):
-    answer: dict   # The LLM's JSON output (parsed)
+    answer: dict
+    context_chunks: List[ChunkInfo]
+    meta: Dict[str, Any]
 
 @app.post("/query", response_model=QueryResponse)
 def query_rag(req: QueryRequest):
@@ -85,24 +95,47 @@ def query_rag(req: QueryRequest):
             log.warning("No context found for query.")
             raise HTTPException(status_code=404, detail="No relevant context found.")
 
-        context_blob = "\n---\n".join(chunk.page_content for chunk in parent_chunks)
+        # Now parent_chunks is a list of dicts: {"doc": ..., "score": ...}
+        chunk_infos = []
+        for item in parent_chunks:
+            doc = item["doc"]
+            score = item.get("score")
+            summary = doc.page_content #[:120].replace('\n', ' ') + ('...' if len(doc.page_content) > 120 else '')
+            chunk_infos.append(ChunkInfo(
+                chunk_id=doc.metadata.get('uid', ''),
+                summary=summary,
+                metadata=doc.metadata,
+                score=score,
+            ))
+
+        context_blob = "\n---\n".join(item["doc"].page_content for item in parent_chunks)
         prompt = PROMPT_TMPL.format(context=context_blob, question=req.question)
+
+        print(context_blob)
 
         answer = generator.generate_response(
             text=prompt,
             response_format="json_object",
             model_name=cfg.DEFAULT.GENERATOR_MODEL
         )
+
         log.info("LLM generation complete for query.")
 
-        import json as pyjson
         if isinstance(answer, str):
             try:
-                answer = pyjson.loads(answer)
+                answer = json.loads(answer)
             except Exception:
-                answer = {"answer": answer, "citations": []}
+                answer = {"answer": answer}
 
-        return QueryResponse(answer=answer)
+        meta = {
+            "embedding_model": EMBED_MODEL,
+            "generator_model": cfg.DEFAULT.GENERATOR_MODEL,
+            "retriever": retriever.__class__.__name__,
+            "prompt_template": PROMPT_TMPL,
+            "num_context_chunks": len(chunk_infos)
+        }
+
+        return QueryResponse(answer=answer, context_chunks=chunk_infos, meta=meta)
     except HTTPException as e:
         raise e
     except Exception as e:
