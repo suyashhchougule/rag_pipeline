@@ -13,10 +13,7 @@ from retriever import MultiLevelRetriever
 from docstore import DocStore
 from prompt_templates import PROMPT_TMPL
 from index_loader import load_indexes
-
-# Setup
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
+import sys
 BASE_DIR = Path(__file__).parent.parent.resolve()
 CONFIG_PATH = BASE_DIR / "config" / "RagConfig.toml"
 SECRETS_PATH = BASE_DIR / "config" / ".secrtets.toml"
@@ -26,8 +23,28 @@ SENT_IDX_DIR = BASE_DIR / cfg.INGESTION.SENT_IDX_DIR
 PARENT_IDX_DIR = BASE_DIR / cfg.INGESTION.PARENT_IDX_DIR
 SQLITE_PATH = BASE_DIR / cfg.INGESTION.PARENTS_DB
 EMBED_MODEL = cfg.INGESTION.EMBED_MODEL
+LOGGER_FILE = cfg.LOGGER.API_FILE_PATH
 RPM = int(cfg.RATELIMITER.RPM)
 TPM = int(cfg.RATELIMITER.TPM)
+
+def setup_logging():
+    log = logging.getLogger()
+    log.setLevel(logging.INFO)
+    if log.hasHandlers():
+        log.handlers.clear()
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s %(message)s"
+    ))
+    file_handler = logging.FileHandler(LOGGER_FILE, mode="a")
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s %(message)s"
+    ))
+    log.addHandler(console_handler)
+    log.addHandler(file_handler)
+    return logging.getLogger(__name__)
+
+log = setup_logging()
 
 # --- Load everything ONCE at startup ---
 log.info("Initializing indexes, docstore, retriever, and generator...")
@@ -55,28 +72,29 @@ class QueryResponse(BaseModel):
 
 @app.post("/query", response_model=QueryResponse)
 def query_rag(req: QueryRequest):
+    log.info(f"Received query: {req.question}")
     try:
-        # Step 1: Retrieve context
         parent_chunks = retriever.retrieve(
             req.question,
             k_sent=req.k_sent,
             k_parent=req.k_parent,
             max_return=req.max_return
         )
+        log.info(f"Retrieved {len(parent_chunks)} parent chunks for query.")
         if not parent_chunks:
+            log.warning("No context found for query.")
             raise HTTPException(status_code=404, detail="No relevant context found.")
 
         context_blob = "\n---\n".join(chunk.page_content for chunk in parent_chunks)
         prompt = PROMPT_TMPL.format(context=context_blob, question=req.question)
 
-        # Step 2: Generate answer
         answer = generator.generate_response(
             text=prompt,
             response_format="json_object",
             model_name=cfg.DEFAULT.GENERATOR_MODEL
         )
+        log.info("LLM generation complete for query.")
 
-        # (Optional: if answer is a string, parse to dict)
         import json as pyjson
         if isinstance(answer, str):
             try:
@@ -90,3 +108,4 @@ def query_rag(req: QueryRequest):
     except Exception as e:
         log.exception("Error in /query endpoint")
         raise HTTPException(status_code=500, detail=str(e))
+
