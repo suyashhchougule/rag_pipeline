@@ -1,0 +1,72 @@
+# ===================
+# PLATFORM SETTINGS
+# ===================
+# The main platform to use for inference ("CEREBRAS" or others you might add)
+PLATFORM = "CEREBRAS"
+
+# ===================
+# CEREBRAS SETTINGS
+# ===================
+[CEREBRAS]
+# The model identifier for Cerebras API (can be swapped with other supported model IDs)
+MODEL_ID = 'llama-4-scout-17b-16e-instruct'
+# Cerebras API endpoint (You can use any OpenAI-compatible endpoint here)
+ENDPOINT = "https://api.cerebras.ai/v1"
+# Sampling temperature for generation (lower = more deterministic, higher = more random)
+TEMPERATURE = 0.1
+# Maximum number of tokens to generate in a single response
+MAX_TOKENS = 4096
+
+# Any OpenAI compatible model and platform can be added 
+#for ex:
+# [AZURE]
+# MODEL_ID = 'gpt-4' # Your deployement name 
+# ENDPOINT = "your azure endpoint"
+# TEMPERATURE = 0.1
+# MAX_TOKENS = 4096
+
+# ===================
+# INGESTION SETTINGS
+# ===================
+[INGESTION]
+# SQLite database file to track which files have been ingested
+TRACKER_DB = "ingestion_pipeline/ingestion_databases/ingested_files.db"
+# Database for parent document relationships
+PARENTS_DB = "ingestion_pipeline/ingestion_databases/parents.db"
+# Directory for storing all index files
+INDEX_DIR = "ingestion_pipeline/ingestion_databases/indexes"
+# Directory for sentence-level indexes
+SENT_IDX_DIR = "ingestion_pipeline/ingestion_databases/indexes/sentences"
+# Directory for parent document indexes
+PARENT_IDX_DIR = "ingestion_pipeline/ingestion_databases/indexes/parents"
+# Name or path of the embedding model (e.g., any model from Hugging Face)
+EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+# Local path to your Dolphin model for document text and structure extraction 
+DOLPHIN_MODEL_PATH = "./hf_model/"
+# Number of documents to process in each batch during parsing
+DOCUMENT_PARSER_BATCH_SIZE = 256
+# Where to save intermediate outputs from the document parser
+DOCUMENT_PARSER_SAVE_DIR = "ingestion_pipeline/document_parser_save_dir"
+
+# ===================
+# RATE LIMITER SETTINGS
+# ===================
+[RATELIMITER]
+# Requests per minute allowed for your endpoint (RPM)
+RPM = 30
+# Tokens per minute allowed for your endpoint(TPM)
+TPM = 60000
+
+# ===================
+# DEFAULTS
+# ===================
+[DEFAULT]
+# Default model for generation (You can choose)
+GENERATOR_MODEL = "llama-4-scout-17b-16e-instruct"
+
+# ===================
+# LOGGER SETTINGS
+# ===================
+[LOGGER]
+# Path to the API log file
+API_FILE_PATH = "../rag_pipeline_api.log"
