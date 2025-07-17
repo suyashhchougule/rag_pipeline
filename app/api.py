@@ -84,40 +84,56 @@ class QueryResponse(BaseModel):
 def query_rag(req: QueryRequest):
     log.info(f"Received query: {req.question}")
     try:
-        parent_chunks = retriever.retrieve(
-            req.question,
-            k_sent=req.k_sent,
-            k_parent=req.k_parent,
-            max_return=req.max_return
-        )
+        try:
+            parent_chunks = retriever.retrieve(
+                req.question,
+                k_sent=req.k_sent,
+                k_parent=req.k_parent,
+                max_return=req.max_return
+            )
+        except Exception as e:
+            log.exception("Retriever failed")
+            raise HTTPException(status_code=500, detail=f"Retriever error: {str(e)}")
+
         log.info(f"Retrieved {len(parent_chunks)} parent chunks for query.")
         if not parent_chunks:
             log.warning("No context found for query.")
             raise HTTPException(status_code=404, detail="No relevant context found.")
 
-        # Now parent_chunks is a list of dicts: {"doc": ..., "score": ...}
         chunk_infos = []
         for item in parent_chunks:
-            doc = item["doc"]
-            score = item.get("score")
-            summary = doc.page_content #[:120].replace('\n', ' ') + ('...' if len(doc.page_content) > 120 else '')
-            chunk_infos.append(ChunkInfo(
-                chunk_id=doc.metadata.get('uid', ''),
-                summary=summary,
-                metadata=doc.metadata,
-                score=score,
-            ))
+            try:
+                doc = item["doc"]
+                score = item.get("score")
+                summary = doc.page_content
+                chunk_infos.append(ChunkInfo(
+                    chunk_id=doc.metadata.get('uid', ''),
+                    summary=summary,
+                    metadata=doc.metadata,
+                    score=score,
+                ))
+            except Exception as e:
+                log.exception("Failed to process chunk info")
+                continue
 
-        context_blob = "\n---\n".join(item["doc"].page_content for item in parent_chunks)
-        prompt = PROMPT_TMPL.format(context=context_blob, question=req.question)
+        try:
+            context_blob = "\n---\n".join(item["doc"].page_content for item in parent_chunks)
+            prompt = PROMPT_TMPL.format(context=context_blob, question=req.question)
+        except Exception as e:
+            log.exception("Failed to build prompt")
+            raise HTTPException(status_code=500, detail=f"Prompt construction error: {str(e)}")
 
         print(context_blob)
 
-        answer = generator.generate_response(
-            text=prompt,
-            response_format="json_object",
-            model_name=cfg.DEFAULT.GENERATOR_MODEL
-        )
+        try:
+            answer = generator.generate_response(
+                text=prompt,
+                response_format="json_object",
+                model_name=cfg.DEFAULT.GENERATOR_MODEL_SECTION
+            )
+        except Exception as e:
+            log.exception("Generator failed")
+            raise HTTPException(status_code=500, detail=f"Generator error: {str(e)}")
 
         log.info("LLM generation complete for query.")
 
@@ -129,7 +145,7 @@ def query_rag(req: QueryRequest):
 
         meta = {
             "embedding_model": EMBED_MODEL,
-            "generator_model": cfg.DEFAULT.GENERATOR_MODEL,
+            "generator_model": cfg.DEFAULT.GENERATOR_MODEL_SECTION,
             "retriever": retriever.__class__.__name__,
             "prompt_template": PROMPT_TMPL,
             "num_context_chunks": len(chunk_infos)
@@ -140,5 +156,5 @@ def query_rag(req: QueryRequest):
         raise e
     except Exception as e:
         log.exception("Error in /query endpoint")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 

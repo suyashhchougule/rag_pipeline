@@ -66,6 +66,7 @@ class IngestionPipeline:
         log.info(f"Model path: {model_path}")
         log.info(f"Markdown output directory: {self.md_save_dir}")
         log.info(f"Max batch size: {max_batch_size}")
+        log.info(f"Using Embedding model:{embed_model}")
         
         self.parser = DolphinDocumentParser(model_path, self.save_dir, max_batch_size)
         self.tracker = FileTracker(tracker_db)

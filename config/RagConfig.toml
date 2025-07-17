@@ -7,15 +7,24 @@ PLATFORM = "CEREBRAS"
 # ===================
 # CEREBRAS SETTINGS
 # ===================
-[CEREBRAS]
+[CEREBRAS_LLAMA4]
 # The model identifier for Cerebras API (can be swapped with other supported model IDs)
 MODEL_ID = 'llama-4-scout-17b-16e-instruct'
+#API_KEY variable reference in .secrets.toml
+API_KEY = "CEREBRAS_KEY"
 # Cerebras API endpoint (You can use any OpenAI-compatible endpoint here)
 ENDPOINT = "https://api.cerebras.ai/v1"
 # Sampling temperature for generation (lower = more deterministic, higher = more random)
 TEMPERATURE = 0.1
 # Maximum number of tokens to generate in a single response
 MAX_TOKENS = 8192
+
+[CEREBRAS_QWEN]
+MODEL_ID = 'qwen-3-235b-a22b'
+API_KEY = "CEREBRAS_KEY"
+ENDPOINT = "https://api.cerebras.ai/v1"
+TEMPERATURE = 0.1
+MAX_TOKENS = 40000
 
 # Any OpenAI compatible model and platform can be added 
 #for ex:
@@ -40,7 +49,7 @@ SENT_IDX_DIR = "ingestion_pipeline/ingestion_databases/indexes/sentences"
 # Directory for parent document indexes
 PARENT_IDX_DIR = "ingestion_pipeline/ingestion_databases/indexes/parents"
 # Name or path of the embedding model (e.g., any model from Hugging Face)
-EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+EMBED_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 # Local path to your Dolphin model for document text and structure extraction 
 DOLPHIN_MODEL_PATH = "./hf_model/"
 # Number of documents to process in each batch during parsing
@@ -62,7 +71,7 @@ TPM = 60000
 # ===================
 [DEFAULT]
 # Default model for generation (You can choose)
-GENERATOR_MODEL = "llama-4-scout-17b-16e-instruct"
+GENERATOR_MODEL_SECTION = "CEREBRAS_LLAMA4"
 
 # ===================
 # LOGGER SETTINGS

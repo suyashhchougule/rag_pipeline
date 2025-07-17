@@ -5,6 +5,8 @@ from openai import BadRequestError
 from core.generator import BaseResponseGenerator, RateLimiter, TokenLogger
 from langchain_core.messages import HumanMessage
 import time
+import logging
+log = logging.getLogger(__name__)
 
 class OpenAIChatGenerator(BaseResponseGenerator):
     """Concrete implementation using OpenAI via LangChain's ChatOpenAI client."""
@@ -16,34 +18,37 @@ class OpenAIChatGenerator(BaseResponseGenerator):
     ):
         super().__init__(rate_limiter, token_logger)
         self._config = config
-        self._init_chat_client(config)
+        default_section = config.DEFAULT.GENERATOR_MODEL_SECTION
+        self._init_chat_client(default_section)
 
-    def _init_chat_client(self, cfg: dict) -> None:
-        platform = cfg["PLATFORM"]
-        gen = cfg[platform]
-        model_id = gen["MODEL_ID"]
-        self._default_model = model_id
-
-        api_key = str(cfg.KEYS[model_id])
-        endpoint = gen["ENDPOINT"]
-        temp = gen["TEMPERATURE"]
-        max_tk = gen["MAX_TOKENS"]
-
+    def _init_chat_client(self, section: str) -> None:
+        cfg = self._get_model_config(section)
+        self._default_model = section
         self.client = ChatOpenAI(
-            openai_api_key=api_key,
-            base_url=endpoint,
-            model_name=model_id,
-            temperature=temp,
-            max_tokens=max_tk,
+            openai_api_key=cfg["api_key"],
+            base_url=cfg["endpoint"],
+            model_name=cfg["model_id"],
+            temperature=cfg["temp"],
+            max_tokens=cfg["max_tokens"],
         )
 
-    def _configure_model(self, model_name: str) -> None:
-        gen = self._config.get("CEREBRAS", {})
-        if model_name not in gen:
-            raise ValueError(f"Unknown model: {model_name}")
-        new_cfg = {"PLATFORM": self._config["PLATFORM"], model_name: gen[model_name]}
-        self._init_chat_client({**self._config, **new_cfg})
-        self._default_model = model_name
+    def _get_model_config(self, section: str):
+        gen_cfg = self._config.get(section)
+        if not gen_cfg:
+            raise ValueError(f"Model config section '{section}' not found in config.")
+        model_id = gen_cfg["MODEL_ID"]
+        api_key = self._config.KEYS[gen_cfg["API_KEY"]]
+        log.info(f"setting generation model ({model_id})")
+        return {
+            "model_id": model_id,
+            "endpoint": gen_cfg["ENDPOINT"],
+            "temp": gen_cfg.get("TEMPERATURE", 0.1),
+            "max_tokens": gen_cfg.get("MAX_TOKENS"),
+            "api_key": api_key,
+        }
+
+    def _configure_model(self, model_section: str) -> None:
+        self._init_chat_client(model_section)
 
     def _invoke(
         self, messages: List[HumanMessage], response_format: Optional[dict]
@@ -57,7 +62,7 @@ class OpenAIChatGenerator(BaseResponseGenerator):
         try:
             response = client.invoke(messages)
             elapsed = time.time() - start
-            print(f"Model response ({self._default_model}) in {elapsed:.2f}s")
+            log.info(f"Model response ({self._default_model}) in {elapsed:.2f}s")
             return response
         except BadRequestError as e:
             raise RuntimeError(f"Model invocation failed: {e}")
