@@ -148,7 +148,7 @@ Powered by:
 * ByteDance **Dolphin** (VLM)
 * FAISS
 * FastAPI
-* Opens AI-compatible **LLaMA**–like models
+* Opens source **LLaMA**–like models
 * Docker
 
 ---
