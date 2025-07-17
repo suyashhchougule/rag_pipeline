@@ -100,7 +100,7 @@ uv sync
 2. **Populate your secrets file**  
    ```bash
    config/.secrets.toml
-3. Configure config/RagConfig.toml, if required. 
+3. Configure `config/RagConfig.toml`, if required. 
 
 ### 3. Run Ingestion
 
