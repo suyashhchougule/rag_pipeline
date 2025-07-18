@@ -1,6 +1,6 @@
 # RAG Pipeline 📚🔍
 
-A **modular retrieval-augmented generation (RAG)** pipeline that ingests documents (PDF, images), builds vector indexes using FAISS, and exposes a FastAPI endpoint for querying via a chat-based LLM.
+A **modular retrieval-augmented generation (RAG)** pipeline that ingests documents (PDF, images), builds vector indexes, and exposes a FastAPI endpoint for querying via a chat-based LLMs.
 
 ---
 
@@ -18,10 +18,9 @@ A **modular retrieval-augmented generation (RAG)** pipeline that ingests documen
   * Supports rate-limiting and token logging for OpenAI-compatible LLMs
 * 📦 **DevOps-ready**
 
-  * Fully containerizable via Docker
+  * Quick setup UV.
   * Configurable via TOML (`dynaconf`)
   * Logging to file and console with a structured format
-
 ---
 
 ## 📁 Repository Structure
@@ -42,7 +41,7 @@ A **modular retrieval-augmented generation (RAG)** pipeline that ingests documen
 │   └── tokenlogger.py                          # Token usage tracking
 ├── config/
 │   ├── RagConfig.toml                          # Main settings (paths, models)
-│   └── .secrtets.toml                          # Secrets (API keys, tokens)
+│   └── .secrtets.toml                          # template for Secrets (API keys, tokens)
 ├── docs/                                       # Sample docs to ingest
 ├── hf_model/                                   # Local Dolphin VLM files
 ├── ingestion_pipeline/                         # Ingestion & chunking
@@ -57,7 +56,6 @@ A **modular retrieval-augmented generation (RAG)** pipeline that ingests documen
 │   ├── store.py
 │   └── utils/
 ├── pyproject.toml                              # Build & dependency file
-├── Dockerfile                                  # Docker build recipe
 ```
 
 ---
@@ -67,7 +65,6 @@ A **modular retrieval-augmented generation (RAG)** pipeline that ingests documen
 ### Prerequisites
 
 * Python 3.10+
-* Docker (optional)
 * CUDA (for GPU acceleration)
 
 ### 1. Clone & Install
@@ -157,8 +154,7 @@ We combine **hierarchical** *and* **structure-aware** chunking because no single
 | Level            | Method                     | Size / Overlap          | Purpose                        |
 |------------------|----------------------------|-------------------------|--------------------------------|
 | **Sentence**     | Sentence splitter          | ≈ 1–2 sentences, 0 ovl  | Precise keyword hits           |
-| **Intermediate** | Recursive splitter         | **512 tokens**, 64 ovl  | Balance locality & context     |
-| **Parent**       | Recursive splitter         | **2048 tokens**, 128 ovl| Global coherence               |
+| **Parent**       | Recursive splitter         | **2048 tokens**, 128 ovl| Larger context               |
 | **Markdown**     | Header-aware splitter      | `<h1…h6>` boundaries    | Preserve author organisation   |
 
 1. **Hierarchical Re-ranker Retriever (HRR)**  
@@ -335,8 +331,82 @@ Example entry:
 2025-07-17 15:19:09,859 INFO tokenlogger Token usage - prompt: 2097, completion: 126
 2025-07-17 15:19:09,859 INFO api LLM generation complete for query.
 ```
+## 🔐 Security & Secrets
+
+| **Aspect**           | **Implementation**                                         | **Notes**                                                                                                                                     |
+|----------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Config Loader**     | **Dynaconf** – Layered settings                             | Loads from `config/RagConfig.toml` (defaults) → `config/.secrets.toml` (runtime) → environment variables                                      |
+| **Secrets File**      | **Template Only** committed: `config/.secrets.template.toml` | Copy and rename to `.secrets.toml`, then fill in secrets such as `API_KEY`, etc.                                                              |
+| **Runtime Overrides** | Environment variables                                       | All secret keys (e.g., `OPENAI_API_KEY`, `ENDPOINT_URL`, etc.) can be injected via CI/CD pipelines or `docker-compose`                      |
+| **Logging Hygiene**   | Secure logging practices                                    | Secrets are never logged; only safe metrics such as token counts and latency are recorded                                                    |
+> Only the **template** for secrets is tracked in Git; actual credentials stay local or in your secret-manager of choice.
+
+## 🚀 Advanced Features Implemented
+
+**1. Vision-Language Ingestion, not just OCR**  
+ByteDance Dolphin converts both scanned and native PDFs into structured Markdown, preserving tables, figures, and headings. That means the very first ingestion run already handles mixed document types without two separate pipelines.
+
+**2. Hierarchical + document-structure-Aware Chunking**  
+Sentence → parent token hierarchy captures micro and macro context, while header-aware splitting keeps logical sections intact. This hybrid approach mirrors the HRR paper’s recall gains without requiring an extra LLM re-rank call.
+
+**3. Dual-Index Retrieval with Score-Level Fusion**  
+A sentence-level FAISS index surfaces pinpoint matches; a parent-level index supplies broader context. At query time their scores are fused, de-duplicated on `parent_id`, and only the top five parents flow to the prompt—achieving high recall and low prompt cost.
+
+**4. Generator Wrapper for “OpenAI Compatible APIS”**  
+`OpenAIChatGenerator` can hit *any* OpenAI-compatible endpoint (OpenAI, Azure, Vertex, vLLM, Cerebras) by flipping two config keys. In the demo it calls the free **llama-4-scout-17B-16e** model on the Cerebras platform.
+
+**5. Strict JSON-Mode Output**  
+When the upstream model supports it, requests include `response_format={"type":"json_object"}`. That guarantees JSON-parsable answers and eliminates brittle regex post-processing.
+
+**6. RateLimiter with RPM *and* TPM Controls**  
+A class-level limiter enforces both requests-per-minute and tokens-per-minute, protecting upstream quotas, smoothing traffic spikes, and capping cost exposure—all configurable at runtime.
+
+**7. Token Logger for Usage Analytics**  
+`SimpleTokenLogger` records prompt and completion token counts per request, enabling accurate cost tracking and future per-tenant billing.
+
+**8. Layered Secret Management**  
+Only a **template** secrets file ships with the repo; real credentials live in a git-ignored `.secrets.toml` or environment variables. Dynaconf merges defaults → secrets → envs, so CI and Docker deployments stay credential-free.
+
+**9. Structured Logging Ready for ELK/Grafana**  
+Every log line carries a timestamp, level, module, query, chunk counts, similarity scores, latency, and token usage—already formatted for JSON ingestion while still human-readable.
+
+## 🛠️ Next-Level Enhancements for Production, Scale, and Efficiency
 ---
-## ❤️ Acknowledgements
+
+### 1. Retrieval & Indexing
+* **Cross-Encoder Re-ranking for Precision Boost**  
+  Integrate a lightweight cross-encoder such as **Cohere Rerank** or **bge-reranker-large** after the initial out Multi-level retrieval step.  
+  This allows re-ranking the top-30 dense hits with a task-specific relevance model, significantly improving answer precision, especially in long-form, multi-hop queries.
+* **Hybrid Retrieval (BM25 + Vectors)**  
+  Blend lexical BM25 scores with dense embeddings to handle rare terms and spelling variants without sacrificing semantic recall.
+  
+### 2. Parallelised Ingestion with Batched VLM Inference  
+* Improve throughput by parallelising the ingestion pipeline to handle multiple documents concurrently using `ray` tool.  
+* Additionally, AS ByteDance Dolphin VLM has [vllm serving support,](https://github.com/bytedance/Dolphin/blob/master/deployment/vllm/ReadMe.md) We can serve it with **vLLM batched inference** for PDF text extraction, reducing latency and improving GPU utilisation.
+
+### 3. Model serving
+* **Local vLLM / SGLang Inference**  
+  Serve the LLM in-house to avoid network hops and cut the cost per million tokens.
+* We can host our models serverlessly on platforms like `Rupod` and `Google Cloud Run` to save always-on-GPU-VM cost.
+
+### 4. Evaluation
+For evaluation, we can use metrics like MRR, precision, and recall to evaluate Retrieval. 
+For Generation eval, we can use the LLM‑as‑a‑judge framework. These evaluation methods can be implemented with custom scripts or by leveraging tools such as LangSmith or tools mentioned below.
+* **Automated RAG Evaluation**  
+  Run RAGAS/Bench-RAG on a synthetic Q-A set every commit; fail the build if precision/recall regress.
+* **Canary & Blue-Green Deployments**  
+  Roll new embedding models or prompt variants to 5 % traffic; monitor accuracy before 100 % cut-over.
+* **Prompt Registry & Versioning**  
+  Store templates in a git-tracked catalogue; tie each model release to a prompt hash for reproducibility.
+
+### 5. Security & Compliance
+* **API Key + RBAC**  
+  Enforce per-tenant quotas and restrict document access scope.
+---
+
+> Used **GitHub Copilot** and **ChatGPT-4** for quick code refactors and debugging hints, Documentation.
+
+## Acknowledgements
 
 Powered by:
 
@@ -344,6 +414,4 @@ Powered by:
 * FAISS
 * FastAPI
 * Opens source **LLaMA**–like models
-* Docker
-
 ---
