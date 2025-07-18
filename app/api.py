@@ -77,8 +77,8 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: dict
-    context_chunks: List[ChunkInfo]
     meta: Dict[str, Any]
+    context_chunks: List[ChunkInfo]
 
 @app.post("/query", response_model=QueryResponse)
 def query_rag(req: QueryRequest):
@@ -122,9 +122,6 @@ def query_rag(req: QueryRequest):
         except Exception as e:
             log.exception("Failed to build prompt")
             raise HTTPException(status_code=500, detail=f"Prompt construction error: {str(e)}")
-
-        print(context_blob)
-
         try:
             answer = generator.generate_response(
                 text=prompt,
