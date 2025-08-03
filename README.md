@@ -101,6 +101,11 @@ uv sync
 
 ### 3. Run Ingestion
 
+Download Dolphin Model
+
+```huggingface-cli download ByteDance/Dolphin --local-dir ./hf_model```
+
+
 ```bash
 python ingestion_pipeline/ingest.py --input_folder ./docs
 ```
