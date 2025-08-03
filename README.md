@@ -116,7 +116,7 @@ This will parse your files, chunk them, build/update vector indexes, and store e
 
 ```bash
 cd app
-uvicorn app.api:app --reload --port 8000
+uvicorn api:app --reload --port 8000
 ```
 
 Then query via HTTP:
