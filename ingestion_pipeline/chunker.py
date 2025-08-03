@@ -5,7 +5,7 @@ import nltk
 from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
-nltk.download("punkt", quiet=True)
+nltk.download("punkt_tab", quiet=True)
 
 class Chunker:
     """

@@ -22,6 +22,7 @@ from indexer import Indexer
 from dynaconf import Dynaconf
 from pathlib import Path
 from documentparser import DolphinDocumentParser
+import shutil
 BASE_DIR = Path(__file__).parent.parent.resolve()
 
 def setup_logging():
@@ -62,6 +63,21 @@ class IngestionPipeline:
         max_batch_size = config_dict['INGESTION']['DOCUMENT_PARSER_BATCH_SIZE']               
         self.input_path = input_folder
         self.md_save_dir = os.path.join(self.save_dir, "markdown")
+        self.rechunk = config_dict['INGESTION'].get('RECHUNK', False)
+
+        # Clean indexes and parent db if rechunk is True
+        if self.rechunk:
+            sent_idx_dir = BASE_DIR / config_dict['INGESTION']['SENT_IDX_DIR']
+            parent_idx_dir = BASE_DIR / config_dict['INGESTION']['PARENT_IDX_DIR']
+            # Remove FAISS index directories
+            for idx_dir in [sent_idx_dir, parent_idx_dir]:
+                if idx_dir.exists():
+                    shutil.rmtree(idx_dir)
+                    log.info(f"Deleted FAISS index directory: {idx_dir}")
+            # Remove SQLite parent db
+            if parents_db.exists():
+                parents_db.unlink()
+                log.info(f"Deleted parent SQLite DB: {parents_db}")
         
         log.info(f"Model path: {model_path}")
         log.info(f"Markdown output directory: {self.md_save_dir}")
@@ -70,7 +86,7 @@ class IngestionPipeline:
         
         self.parser = DolphinDocumentParser(model_path, self.save_dir, max_batch_size)
         self.tracker = FileTracker(tracker_db)
-        self.loader  = Loader(self.md_save_dir, self.tracker)
+        self.loader  = Loader(self.md_save_dir, self.tracker, rechunk=self.rechunk)
         self.chunker = Chunker()
         self.store   = SQLiteBlobStore(parents_db)
         self.indexer = Indexer(embed_model, index_dir)

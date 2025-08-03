@@ -57,6 +57,8 @@ DOCUMENT_PARSER_BATCH_SIZE = 256
 # Where to save intermediate outputs from the document parser
 DOCUMENT_PARSER_SAVE_DIR = "ingestion_pipeline/document_parser_save_dir"
 
+RECHUNK = true
+
 # ===================
 # RATE LIMITER SETTINGS
 # ===================

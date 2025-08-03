@@ -56,10 +56,11 @@ class Loader:
     """
     Discovers files in a folder, normalises and splits into sections.
     """
-    def __init__(self, input_folder: str, tracker: FileTracker, patterns: List[str] = ["*.md"]):
+    def __init__(self, input_folder: str, tracker: FileTracker, patterns: List[str] = ["*.md"], rechunk: bool = False):
         self.input_folder = Path(input_folder)
         self.tracker = tracker
         self.patterns = patterns
+        self.rechunk = rechunk
 
     def discover_files(self) -> List[Path]:
         files: List[Path] = []
@@ -71,7 +72,7 @@ class Loader:
         docs: List[Document] = []
         splitter = MarkdownHeaderTextSplitter(headers_to_split_on=[("#","H1"),("##","H2")], strip_headers=False)
         for file in self.discover_files():
-            if not self.tracker.has_changed(file):
+            if not self.rechunk and not self.tracker.has_changed(file):
                 continue
             raw = file.read_text(encoding="utf-8")
             md = Normalizer.normalise_tables(raw)

@@ -30,6 +30,16 @@ class Indexer:
             self.s_index = FAISS.load_local(str(self.sent_dir), self.embed, allow_dangerous_deserialization=True)
             self.p_index = FAISS.load_local(str(self.parent_dir), self.embed, allow_dangerous_deserialization=True)
 
+    def get_num_vectors_in_sentence_index(self) -> int:
+        if self.s_index is not None:
+            return self.s_index.index.ntotal
+        return 0  # or raise an error if preferred
+
+    def get_num_vectors_in_parent_index(self) -> int:
+        if self.p_index is not None:
+            return self.p_index.index.ntotal
+        return 0
+
     def add_documents(
         self,
         sentence_docs: List[Document],
@@ -56,6 +66,9 @@ class Indexer:
                 self.p_index = FAISS.from_documents(parent_docs, self.embed)
             else:
                 self.p_index.add_documents(parent_docs)
+
+        print(f"After adding: {self.get_num_vectors_in_sentence_index()} sentence vectors")
+        print(f"After adding: {self.get_num_vectors_in_parent_index()} parent vectors")
 
     def save(self):
         """Persist both indexes to disk so they can be re-loaded next time."""
