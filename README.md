@@ -1,6 +1,6 @@
 # RAG Pipeline 📚🔍
 
-A **modular retrieval-augmented generation (RAG)** pipeline that ingests documents (PDF, images), builds vector indexes, and exposes a FastAPI endpoint for querying via a chat-based LLMs.
+A **modular retrieval-augmented generation (RAG)** pipeline that ingests documents (PDF, images), builds vector indexes, and exposes a FastAPI endpoint for querying via both **simple RAG** and **agentic RAG** architectures.
 
 ---
 
@@ -12,52 +12,31 @@ A **modular retrieval-augmented generation (RAG)** pipeline that ingests documen
   * Normalizes HTML tables, splits into sections, chunks into parent and sentence-level documents
   * Skips re-ingestion of unchanged files using SHA-256 file tracking
   * Stores parent chunks in SQLite and maintains FAISS indexes for retrieval
-* 🤖 **Retrieval and generation**
+    
+* 🤖 **Dual RAG architectures**
 
-  * FastAPI `/query` endpoint that retrieves context and calls LLM for structured answers
-  * Supports rate-limiting and token logging for OpenAI-compatible LLMs
+  * Simple RAG: Direct retrieval + generation pipeline with rate-limiting and token logging
+  * Agentic RAG: LangGraph-powered multi-agent system with question decomposition and orchestration
+  * Unified API endpoint with rag_type parameter to switch between architectures
+  * Comprehensive metadata collection for both approaches
+
+* 🎯 **Agent-based intelligence**
+
+  * Planner Agent: **Decomposes complex questions into focused sub-questions and gives detailed answers**
+  * Retriever Agent: Performs multi-level document retrieval with context gathering
+  * Supervisor: Orchestrates agents and synthesizes final structured responses
+  * Built on LangGraph with ReAct agent framework for reliable multi-step reasoning
+ 
+* 📊 **Production-ready API**
+  * FastAPI endpoints: /query, /health, /stats, /info
+  * Comprehensive error handling and input validation
+  * Structured JSON responses with detailed metadata
+
 * 📦 **DevOps-ready**
 
   * Quick setup UV.
   * Configurable via TOML (`dynaconf`)
   * Logging to file and console with a structured format
----
-
-## 📁 Repository Structure
-
-```text
-├── README.md                                   # Project overview and setup
-├── app                                         # API & core runtime
-│   ├── api.py                                  # FastAPI entry‑point
-│   ├── core/
-│   │   └── generator.py                        # Generic abstraction class for LLM API Calls
-│   ├── docstore.py                             # SQLite doc blob store
-│   ├── generator.py                            # (wrapper for generator)
-│   ├── index_loader.py                         # Load FAISS indexes
-│   ├── main.py                                 # CLI/demo
-│   ├── prompt_templates.py                     # Prompt templates for RAG/LLM
-│   ├── ratelimiter.py                          # Request/token limiter
-│   ├── retriever.py                            # Multi-level retriever logic
-│   └── tokenlogger.py                          # Token usage tracking
-├── config/
-│   ├── RagConfig.toml                          # Main settings (paths, models)
-│   └── .secrtets.toml                          # template for Secrets (API keys, tokens)
-├── docs/                                       # Sample docs to ingest
-├── hf_model/                                   # Local Dolphin VLM files
-├── ingestion_pipeline/                         # Ingestion & chunking
-│   ├── chunker.py
-│   ├── document_parser_save_dir/               # Saved markdown & images
-│   ├── documentparser.py
-│   ├── filetracker.py
-│   ├── indexer.py
-│   ├── ingest.py
-│   ├── ingestion_databases/                    # SQLite + FAISS data
-│   ├── loader.py
-│   ├── store.py
-│   └── utils/
-├── pyproject.toml                              # Build & dependency file
-```
-
 ---
 
 ## 🛠️ Getting Started
@@ -80,9 +59,8 @@ git clone https://github.com/suyashhchougule/rag_pipeline.git
 cd rag_pipeline
 
 # Create env & install deps in one go
-uv venv
-source .venv/bin/activate
 uv sync
+source .venv/bin/activate
 ```
 
 ---
@@ -103,10 +81,9 @@ uv sync
 
 Download Dolphin Model
 
-```huggingface-cli download ByteDance/Dolphin --local-dir ./hf_model```
-
-
 ```bash
+huggingface-cli download ByteDance/Dolphin --local-dir ./hf_model
+
 python ingestion_pipeline/ingest.py --input_folder ./docs
 ```
 
@@ -116,15 +93,31 @@ This will parse your files, chunk them, build/update vector indexes, and store e
 
 ```bash
 cd app
-uvicorn api:app --reload --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Then query via HTTP:
 
 ```bash
-curl -X POST localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{ "question": "Define affinity fraud" }'
+# Get system info
+curl http://localhost:8000/api/v1/info
+
+# Health check for simple RAG
+curl "http://localhost:8000/api/v1/health?rag_type=simple"
+
+# Health check for agentic RAG
+curl "http://localhost:8000/api/v1/health?rag_type=agentic"
+
+# Query simple RAG
+curl -X POST "http://localhost:8000/api/v1/query?rag_type=simple" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "What is Affinity fraud?", "k_sent": 20, "k_parent": 10, "max_return": 10}'
+
+# Complex Query handling with agentic RAG  
+curl -X POST "http://localhost:8000/api/v1/query?rag_type=agentic" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "List the different types of frauds", "k_sent": 20, "k_parent": 10, "max_return": 10}'
+
 ```
 ###  Architecture Overview: 
 
@@ -279,6 +272,28 @@ json
 }}
 ```
 
+## Agentic Architecture (LangGraph + ReAct)
+For complex queries requiring decomposition, the system employs a **multi-agent architecture** powered by **LangGraph**:
+
+### Agent Roles
+| Agent | Purpose | Tools |
+|-------|---------|-------|
+| **Planner Expert** | Breaks down complex questions into sub-questions | `plan_sub_questions` |
+| **Retriever Expert** | Fetches context using multi-level retrieval | `multi_level_retrieve` |
+| **Supervisor** | Orchestrates agents and synthesizes final answers | Agent coordination |
+
+### LangGraph Supervisor Pattern
+- **Orchestration**: Supervisor manages agent handoffs and maintains conversation state
+- **Tool Integration**: Each agent has specialized tools for their domain expertise  
+- **Structured Output**: All agents use JSON mode for reliable inter-agent communication
+- **Error Handling**: Graceful fallbacks when agents encounter issues
+
+### Benefits Over Simple RAG
+- **Complex Query Handling**: Decomposes multi-part questions automatically
+- **Better Context Coverage**: Each sub-question gets dedicated retrieval attention
+- **Reasoning Transparency**: Agent interactions provide explainable decision paths
+- **Adaptive Processing**: Different strategies for simple vs. complex queries
+
 ## 🔌 API Reference
 
 ### `POST /query`
@@ -374,6 +389,10 @@ Only a **template** secrets file ships with the repo; real credentials live in a
 
 **9. Structured Logging Ready for ELK/Grafana**  
 Every log line carries a timestamp, level, module, query, chunk counts, similarity scores, latency, and token usage—already formatted for JSON ingestion while still human-readable.
+
+**10. Multi-Agent RAG with LangGraph Orchestration**  
+Agentic RAG implementation using LangGraph's supervisor pattern with specialized ReAct agents. The planner agent decomposes complex queries, the retriever agent handles context gathering with domain expertise, and the supervisor orchestrates the workflow while maintaining conversation state and synthesizing final answers.
+
 
 ## 🛠️ Next-Level Enhancements for Production, Scale, and Efficiency
 ---
