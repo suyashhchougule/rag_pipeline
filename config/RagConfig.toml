@@ -20,11 +20,18 @@ TEMPERATURE = 0.1
 MAX_TOKENS = 8192
 
 [CEREBRAS_QWEN]
-MODEL_ID = 'qwen-3-235b-a22b'
+MODEL_ID = 'qwen-3-235b-a22b-thinking-2507'
 API_KEY = "CEREBRAS_KEY"
 ENDPOINT = "https://api.cerebras.ai/v1"
 TEMPERATURE = 0.1
-MAX_TOKENS = 40000
+MAX_TOKENS = 65536
+
+[AGENT]
+MODEL_ID = 'gpt-4o'
+API_KEY = "AZURE_GPT4_KEY"
+ENDPOINT = ""
+TEMPERATURE = 0.01
+MAX_TOKENS = 8192
 
 # Any OpenAI compatible model and platform can be added 
 #for ex:
@@ -73,7 +80,7 @@ TPM = 60000
 # ===================
 [DEFAULT]
 # Default model for generation (You can choose)
-GENERATOR_MODEL_SECTION = "CEREBRAS_LLAMA4"
+GENERATOR_MODEL_SECTION = "AGENT"
 
 # ===================
 # LOGGER SETTINGS
