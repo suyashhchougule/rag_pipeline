@@ -71,6 +71,7 @@ source .venv/bin/activate
    - Go to the [Cerebras Cloud platform](https://cloud.cerebras.ai/platform/org_4myhnjpmnjyx3mrjt3nwmy33/apikeys):  
    - Log in (or sign up if you don’t have an account).  
    - Click **“Create API Key”**, copy the generated key.
+   - Please add GPT-4o or any reasoning model API key and corresponding credentials as well for the agent RAG to work.
 
 2. **Populate your secrets file**  
    ```bash
