@@ -101,6 +101,11 @@ uv sync
 
 ### 3. Run Ingestion
 
+Download Dolphin Model
+
+```huggingface-cli download ByteDance/Dolphin --local-dir ./hf_model```
+
+
 ```bash
 python ingestion_pipeline/ingest.py --input_folder ./docs
 ```
@@ -111,7 +116,7 @@ This will parse your files, chunk them, build/update vector indexes, and store e
 
 ```bash
 cd app
-uvicorn app.api:app --reload --port 8000
+uvicorn api:app --reload --port 8000
 ```
 
 Then query via HTTP:
