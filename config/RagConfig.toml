@@ -28,18 +28,16 @@ MAX_TOKENS = 65536
 
 [AGENT]
 MODEL_ID = 'gpt-4o'
-API_KEY = "AZURE_GPT4_KEY"
-ENDPOINT = ""
+API_KEY = "YOUR_API_KEY"
+ENDPOINT = "OPENAI Compatible Endpoint"
 TEMPERATURE = 0.01
 MAX_TOKENS = 8192
 
-# Any OpenAI compatible model and platform can be added 
-#for ex:
-# [AZURE]
-# MODEL_ID = 'gpt-4' # Your deployement name 
-# ENDPOINT = "your azure endpoint"
-# TEMPERATURE = 0.1
-# MAX_TOKENS = 4096
+#Add any other model config, if required
+
+[DEFAULT]
+# Default model for generation (Please change this if you want to use ANY other above-listed model config)
+GENERATOR_MODEL_SECTION = "AGENT"
 
 # ===================
 # INGESTION SETTINGS
@@ -74,13 +72,6 @@ RECHUNK = true
 RPM = 30
 # Tokens per minute allowed for your endpoint(TPM)
 TPM = 60000
-
-# ===================
-# DEFAULTS
-# ===================
-[DEFAULT]
-# Default model for generation (You can choose)
-GENERATOR_MODEL_SECTION = "AGENT"
 
 # ===================
 # LOGGER SETTINGS
