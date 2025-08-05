@@ -59,8 +59,9 @@ git clone https://github.com/suyashhchougule/rag_pipeline.git
 cd rag_pipeline
 
 # Create env & install deps in one go
-uv sync
+uv venv --python 3.11
 source .venv/bin/activate
+uv sync
 ```
 
 ---
@@ -71,7 +72,7 @@ source .venv/bin/activate
    - Go to the [Cerebras Cloud platform](https://cloud.cerebras.ai/platform/org_4myhnjpmnjyx3mrjt3nwmy33/apikeys):  
    - Log in (or sign up if you don’t have an account).  
    - Click **“Create API Key”**, copy the generated key.
-   - Please add GPT-4o or any reasoning model API key and corresponding credentials as well for the agent RAG to work.
+   - **Please add GPT-4o or any reasoning model OPENAI compatible API key and corresponding credentials to the [AGENT] section in config for the agent RAG to work.**
 
 2. **Populate your secrets file**  
    ```bash
@@ -112,13 +113,12 @@ curl "http://localhost:8000/api/v1/health?rag_type=agentic"
 # Query simple RAG
 curl -X POST "http://localhost:8000/api/v1/query?rag_type=simple" \
      -H "Content-Type: application/json" \
-     -d '{"question": "What is Affinity fraud?", "k_sent": 20, "k_parent": 10, "max_return": 10}'
+     -d '{"question": "What is Affinity fraud?"}'
 
 # Complex Query handling with agentic RAG  
 curl -X POST "http://localhost:8000/api/v1/query?rag_type=agentic" \
      -H "Content-Type: application/json" \
-     -d '{"question": "List the different types of frauds", "k_sent": 20, "k_parent": 10, "max_return": 10}'
-
+     -d '{"question": "List the different types of frauds"}'
 ```
 ###  Architecture Overview: 
 
